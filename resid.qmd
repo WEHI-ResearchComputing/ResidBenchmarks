@@ -1,0 +1,125 @@
+---
+title: "Residual Benchmarking"
+subtitle: Benchmarking different ways to calculate residuals in R using a number of different packages.
+format: html
+---
+
+## Functions for generating matrices
+
+```{r}
+make_dense <- function(size){
+  rnorm(size) |> matrix(nrow=sqrt(size))
+}
+make_dense(16)
+```
+
+```{r}
+make_sparse <- function(size){
+  zeroes <- sample(c(TRUE, FALSE), size=size * 0.9, replace=TRUE)
+  `[<-`(make_dense(size), zeroes, 0)
+}
+make_sparse(16)
+```
+```{r}
+make_y <- function(x){
+  beta <- ncol(x) |> runif(max=100)
+  as.numeric(x %*% beta)
+}
+```
+
+
+## Functions for calculating residuals
+
+These functions take the vector $\vec{y}$ and matrix $X$, and return the residuals resulting from estimating $\vec{y}$ from $X$ using ordinary least squares regression:
+
+$\mathbf{y} - \left(\mathbf {X} ^{\operatorname {T} }\mathbf {X} \right)^{-1}\mathbf {X} ^{\operatorname {T} }\mathbf {y}$
+
+```{r}
+qr_resid <- function(x, y){
+  qr(x) |> qr.resid(y)
+}
+```
+
+```{r}
+formula_resid <- function(x, y){
+  y - x %*% solve(t(x) %*% x) %*% t(x) %*% y
+}
+```
+
+```{r}
+lm_resid <- function(x, y){
+  lm(y ~ x) |> resid()
+}
+```
+
+```{r}
+lm_fit_resid <- function(x, y){
+  .lm.fit(x, y)$residuals
+}
+```
+
+```{r}
+eigen_resid <- Rcpp::cppFunction("
+SEXP fastResidop(const Eigen::Map<Eigen::MatrixXd> X, Eigen::Map<Eigen::MatrixXd> Y){
+  Eigen::MatrixXd T1 = X.transpose() * X ;
+  Eigen::MatrixXd T2 = T1.inverse();
+  Eigen::MatrixXd T3 = X * T2;
+  Eigen::MatrixXd T4 = X.transpose() * Y;
+  Eigen::MatrixXd T5 = T3 * T4;
+  Eigen::MatrixXd T6 = Y - T5;
+  return Rcpp::wrap(T6);
+}
+", depends = "RcppEigen")
+```
+
+```{r}
+eigen_fastlm_resid <- function(x, y){
+  RcppEigen::fastLm(x, y) |> resid()
+}
+```
+
+```{r}
+rfast_resid <- function(x, y){
+  Rfast::lmfit(x, y)$residuals
+}
+```
+
+## Benchmark
+
+```{r}
+results <- bench::press(
+  make_matrix = list(dense=make_dense, sparse=make_sparse),
+  calculate = list(
+    qr=qr_resid,
+    formula=formula_resid,
+    lm=lm_resid,
+    eigen_cpp=eigen_resid,
+    .lm.fit=lm_fit_resid,
+    eigen_fastlm = eigen_fastlm_resid,
+    rfast = rfast_resid
+  ),
+  edge_size = c(40, 400, 1000),
+  bench::mark(
+    min_iterations = 3,
+    {
+      size <- edge_size ^ 2
+      x <- make_matrix[[1]](size)
+      y <- make_y(x)
+      calculate[[1]](x, y)
+    }
+  )
+)
+results |>
+  dplyr::mutate(
+    matrix = names(make_matrix),
+    func = names(calculate),
+    .before = min,
+  ) |>
+  dplyr::select(
+    edge_size,
+    matrix,
+    func,
+    median,
+    mem_alloc
+  )
+```
