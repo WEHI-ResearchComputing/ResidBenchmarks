@@ -2,32 +2,42 @@
 title: "Residual Benchmarking"
 subtitle: Benchmarking different ways to calculate residuals in R using a number of different packages.
 format: html
+df-print: paged
 ---
 
 ## Functions for generating matrices
 
 ```{r}
-make_dense <- function(size){
-  rnorm(size) |> matrix(nrow=sqrt(size))
+make_dense <- function(nrow, ncol){
+  rnorm(nrow * ncol, mean = 1, sd = 5) |> matrix(nrow=nrow)
 }
-make_dense(16)
+make_dense(10, 4)
 ```
 
 ```{r}
-make_sparse <- function(size){
-  zeroes <- sample(c(TRUE, FALSE), size=size * 0.9, replace=TRUE)
-  `[<-`(make_dense(size), zeroes, 0)
+make_sparse <- function(nrow, ncol){
+  zeroes <- sample(c(TRUE, FALSE), size=nrow * ncol * 0.9, replace=TRUE)
+  `[<-`(make_dense(nrow, ncol), zeroes, 0) |> Matrix::Matrix(sparse=TRUE)
 }
-make_sparse(16)
+
 ```
 ```{r}
-make_y <- function(x){
+make_y_vector <- function(x){
   beta <- ncol(x) |> runif(max=100)
   as.numeric(x %*% beta)
 }
+make_dense(4, 4) |> 
+  make_y_vector()
 ```
 
-
+```{r}
+make_y_matrix <- function(x, cols=2){
+  beta <- (cols * ncol(x)) |> runif(max=100) |> matrix(ncol=2)
+  x %*% beta
+}
+make_dense(4, 4) |> 
+  make_y_matrix()
+```
 ## Functions for calculating residuals
 
 These functions take the vector $\vec{y}$ and matrix $X$, and return the residuals resulting from estimating $\vec{y}$ from $X$ using ordinary least squares regression:
@@ -73,53 +83,100 @@ SEXP fastResidop(const Eigen::Map<Eigen::MatrixXd> X, Eigen::Map<Eigen::MatrixXd
 ```
 
 ```{r}
-eigen_fastlm_resid <- function(x, y){
-  RcppEigen::fastLm(x, y) |> resid()
+eigen_fastlm_resid <- function(...){
+  RcppEigen::fastLm(...) |> resid()
 }
 ```
 
 ```{r}
-rfast_resid <- function(x, y){
-  Rfast::lmfit(x, y)$residuals
+rfast_resid <- function(...){
+  Rfast::lmfit(...)$residuals
 }
 ```
 
+## Demos
+
+```{r}
+all_funcs = list(
+  qr=qr_resid,
+  formula=formula_resid,
+  lm=lm_resid,
+  eigen_cpp=eigen_resid,
+  .lm.fit=lm_fit_resid,
+  eigen_fastlm_colpiv_qr = \(x, y) eigen_fastlm_resid(x, y, 0),
+  eigen_fastlm_unpiv_qr = \(x, y) eigen_fastlm_resid(x, y, 1),
+  eigen_fastlm_llt_chol = \(x, y) eigen_fastlm_resid(x, y, 2),
+  eigen_fastlm_ldlt_chol = \(x, y) eigen_fastlm_resid(x, y, 3),
+  eigen_fastlm_jacobi_svd = \(x, y) eigen_fastlm_resid(x, y, 4),
+  eigen_fastlm_eig = \(x, y) eigen_fastlm_resid(x, y, 4),
+  rfast = rfast_resid
+)
+```
+
+```{r}
+x <- make_dense(10, 2)
+x
+```
+```{r}
+y <- make_y_vector(x)
+y
+```
+
+```{r, eval=FALSE}
+purrr::iwalk(all_funcs, function(func, name){
+  resids <- func(x, y) |> paste0(collapse = ", ")
+  glue::glue("Residuls using {name}: {resids}") |> print()
+})
+```
 ## Benchmark
 
 ```{r}
-results <- bench::press(
-  make_matrix = list(dense=make_dense, sparse=make_sparse),
-  calculate = list(
-    qr=qr_resid,
-    formula=formula_resid,
-    lm=lm_resid,
-    eigen_cpp=eigen_resid,
-    .lm.fit=lm_fit_resid,
-    eigen_fastlm = eigen_fastlm_resid,
-    rfast = rfast_resid
-  ),
-  edge_size = c(40, 400, 1000),
-  bench::mark(
-    min_iterations = 3,
-    {
-      size <- edge_size ^ 2
-      x <- make_matrix[[1]](size)
+benchmark <- function(make_x, make_y, nrow, calculate, repetition, ...){
+  time <- bench::mark({
+     ncol <- nrow / 10
+      x <- make_x(nrow, ncol)
       y <- make_y(x)
-      calculate[[1]](x, y)
-    }
+      result <- try(calculate(x, y))
+  }, min_iterations = repetition)
+  
+  time |> dplyr::mutate(
+    result = list(result),
+    ...
   )
-)
-results |>
-  dplyr::mutate(
-    matrix = names(make_matrix),
-    func = names(calculate),
-    .before = min,
-  ) |>
-  dplyr::select(
-    edge_size,
-    matrix,
-    func,
-    median,
-    mem_alloc
+}
+```
+
+```{r}
+tibble::tibble(
+    name = names(all_funcs),
+    calculate = all_funcs,
+) |>
+dplyr::cross_join(
+  tibble::tibble(
+    make_x = list(make_dense, make_sparse),
+    x_type = c("dense", "sparse")
   )
+) |>
+dplyr::cross_join(
+  tibble::tibble(
+    make_y = list(make_y_matrix, make_y_vector),
+    y_type = c("y_matrix", "y_vector")
+  )
+) |> 
+dplyr::mutate(
+  nrow = 4000,
+  repetition = 2,
+) |>
+dplyr::filter(
+  # eigen_cpp will crash with a sparse matrix
+  !(x_type == "sparse" & name == "eigen_cpp")
+) |>
+purrr::pmap(benchmark) |>
+purrr::list_rbind() |>
+dplyr::mutate(
+  success = result |> purrr::map_lgl(function(x){
+    !(x[[1]] |> attr("condition") |> inherits("error"))
+  }) 
+) |>
+dplyr::select(name, success, x_type, y_type, median, mem_alloc)
 ```
