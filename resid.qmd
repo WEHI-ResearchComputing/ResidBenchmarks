@@ -83,7 +83,13 @@ SEXP fastResidop(const Eigen::Map<Eigen::MatrixXd> X, Eigen::Map<Eigen::MatrixXd
 ```
 
 ```{r}
-eigen_resid_qr <- Rcpp::sourceCpp(file="resid.cpp")
+Rcpp::sourceCpp(file="resid.cpp")
+qr_eigen <- function(x, y){
+    if (inherits(x, "sparseMatrix"))
+        qr_sparse_residop(x, y)
+    else
+        qr_dense_residop(x, y)
+}
 ```
 
 ```{r}
@@ -106,7 +112,7 @@ all_funcs = list(
   formula=formula_resid,
   lm=lm_resid,
   eigen_cpp=eigen_resid,
-  eigen_resid_qr=eigen_resid_qr,
+  qr_eigen=qr_eigen,
   .lm.fit=lm_fit_resid,
   eigen_fastlm_colpiv_qr = \(x, y) eigen_fastlm_resid(x, y, 0),
   eigen_fastlm_unpiv_qr = \(x, y) eigen_fastlm_resid(x, y, 1),
@@ -125,13 +131,6 @@ x
 ```{r}
 y <- make_y_vector(x)
 y
-```
-
-```{r, eval=FALSE}
-purrr::iwalk(all_funcs, function(func, name){
-  resids <- func(x, y) |> paste0(collapse = ", ")
-  glue::glue("Residuls using {name}: {resids}") |> print()
-})
 ```
 ## Benchmark
 
