@@ -92,13 +92,9 @@ SEXP fastResidop(const Eigen::Map<Eigen::MatrixXd> X, Eigen::Map<Eigen::MatrixXd
 
 
 A custom function that uses Eigen + QR decomposition.
-The source code is:
+This relies on some C++ code:
 
-```{.cpp include="resid.cpp"}
-```
-
-```{r}
-Rcpp::sourceCpp(file="resid.cpp", showOutput = FALSE)
+```{Rcpp, file="resid.cpp"}
 ```
 
 ```{r}
@@ -172,7 +168,7 @@ all_funcs = list(
 ```
 
 Run the benchmark:
-```{r, error=FALSE, message=FALSE, warning=FALSE}
+```{r, error=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
 tibble::tibble(
     name = names(all_funcs),
     calculate = all_funcs,
