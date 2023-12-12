@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Residual Benchmarking</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="resid_files/libs/clipboard/clipboard.min.js"></script>
+<script src="resid_files/libs/quarto-html/quarto.js"></script>
+<script src="resid_files/libs/quarto-html/popper.min.js"></script>
+<script src="resid_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="resid_files/libs/quarto-html/anchor.min.js"></script>
+<link href="resid_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="resid_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="resid_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="resid_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="resid_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+<link href="resid_files/libs/pagedtable-1.1/css/pagedtable.css" rel="stylesheet">
+<script src="resid_files/libs/pagedtable-1.1/js/pagedtable.js"></script>
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Residual Benchmarking</h1>
+<p class="subtitle lead">Benchmarking different ways to calculate residuals in R using a number of different packages.</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="functions-for-generating-matrices" class="level2">
+<h2 class="anchored" data-anchor-id="functions-for-generating-matrices">Functions for generating matrices</h2>
+<p>These functions generate test X and Y vectors and matrices.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>make_dense <span class="ot">&lt;-</span> <span class="cf">function</span>(nrow, ncol){</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rnorm</span>(nrow <span class="sc">*</span> ncol, <span class="at">mean =</span> <span class="dv">1</span>, <span class="at">sd =</span> <span class="dv">5</span>) <span class="sc">|&gt;</span> <span class="fu">matrix</span>(<span class="at">nrow=</span>nrow)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">make_dense</span>(<span class="dv">10</span>, <span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>            [,1]       [,2]        [,3]      [,4]
+ [1,] -0.2619448  1.5339530  0.37933927 -6.569499
+ [2,]  3.1160156 -2.6216353  1.28678881 -1.639937
+ [3,] -0.6961110  5.3979829  1.94107402  5.545045
+ [4,]  6.3304251  5.4041444  3.06761581 -2.973141
+ [5,]  3.3312555 -0.8987091 -5.59862955  9.205016
+ [6,]  7.1276303  3.9197237  0.09610331 -3.241705
+ [7,] -0.3017159 -1.6852860 -0.09161396  5.282630
+ [8,] -5.1878699 -8.0225094  0.81913575  9.417353
+ [9,] -4.2879429 -3.0103091 -1.50281166  6.818582
+[10,]  0.6960545  0.4986333 -1.48464368 -3.498805</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>make_sparse <span class="ot">&lt;-</span> <span class="cf">function</span>(nrow, ncol){</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  zeroes <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="fu">c</span>(<span class="cn">TRUE</span>, <span class="cn">FALSE</span>), <span class="at">size=</span>nrow <span class="sc">*</span> ncol <span class="sc">*</span> <span class="fl">0.9</span>, <span class="at">replace=</span><span class="cn">TRUE</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">[&lt;-</span><span class="st">`</span>(<span class="fu">make_dense</span>(nrow, ncol), zeroes, <span class="dv">0</span>) <span class="sc">|&gt;</span> Matrix<span class="sc">::</span><span class="fu">Matrix</span>(<span class="at">sparse=</span><span class="cn">TRUE</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>make_y_vector <span class="ot">&lt;-</span> <span class="cf">function</span>(x){</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  beta <span class="ot">&lt;-</span> <span class="fu">ncol</span>(x) <span class="sc">|&gt;</span> <span class="fu">runif</span>(<span class="at">max=</span><span class="dv">100</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.numeric</span>(<span class="fu">as.matrix</span>(x) <span class="sc">%*%</span> beta)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="fu">make_dense</span>(<span class="dv">4</span>, <span class="dv">4</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">make_y_vector</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 1669.3190 -377.0241 1190.1209  150.9376</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>make_y_matrix <span class="ot">&lt;-</span> <span class="cf">function</span>(x, <span class="at">cols=</span><span class="dv">2</span>){</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  beta <span class="ot">&lt;-</span> (cols <span class="sc">*</span> <span class="fu">ncol</span>(x)) <span class="sc">|&gt;</span> <span class="fu">runif</span>(<span class="at">max=</span><span class="dv">100</span>) <span class="sc">|&gt;</span> <span class="fu">matrix</span>(<span class="at">ncol=</span><span class="dv">2</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  x <span class="sc">%*%</span> beta</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="fu">make_dense</span>(<span class="dv">4</span>, <span class="dv">4</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">make_y_matrix</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>           [,1]       [,2]
+[1,] -374.13593 -380.79741
+[2,]  265.67298  -72.04778
+[3,] 1545.42306 1611.80121
+[4,]   14.23788 -406.19847</code></pre>
+</div>
+</div>
+</section>
+<section id="functions-for-calculating-residuals" class="level2">
+<h2 class="anchored" data-anchor-id="functions-for-calculating-residuals">Functions for calculating residuals</h2>
+<p>These functions take the vector <span class="math inline">\(\vec{y}\)</span> and matrix <span class="math inline">\(X\)</span>, and return the residuals resulting from estimating <span class="math inline">\(\vec{y}\)</span> from <span class="math inline">\(X\)</span> using ordinary least squares regression:</p>
+<p><span class="math inline">\(\mathbf{y} - \left(\mathbf {X} ^{\operatorname {T} }\mathbf {X} \right)^{-1}\mathbf {X} ^{\operatorname {T} }\mathbf {y}\)</span></p>
+<p>Using standard matrix operations in R:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>formula_resid <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y){</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  y <span class="sc">-</span> x <span class="sc">%*%</span> <span class="fu">solve</span>(<span class="fu">t</span>(x) <span class="sc">%*%</span> x) <span class="sc">%*%</span> <span class="fu">t</span>(x) <span class="sc">%*%</span> y</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Base R’s QR decomposition:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>qr_resid <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y){</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">qr</span>(x) <span class="sc">|&gt;</span> <span class="fu">qr.resid</span>(<span class="fu">as.matrix</span>(y))</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Base R’s <code>lm</code> function:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>lm_resid <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y){</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">lm</span>(y <span class="sc">~</span> x) <span class="sc">|&gt;</span> <span class="fu">resid</span>()</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Base R’s <code>.lm.fit</code>, which is a lower level function underlying <code>lm</code>:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>lm_fit_resid <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y){</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">.lm.fit</span>(x, y)<span class="sc">$</span>residuals</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Algebraically calculating the residuals, but using Eigen C++ instead of base R:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>eigen_resid <span class="ot">&lt;-</span> Rcpp<span class="sc">::</span><span class="fu">cppFunction</span>(<span class="st">"</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="st">SEXP fastResidop(const Eigen::Map&lt;Eigen::MatrixXd&gt; X, Eigen::Map&lt;Eigen::MatrixXd&gt; Y){</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="st">  Eigen::MatrixXd T1 = X.transpose() * X ;</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="st">  Eigen::MatrixXd T2 = T1.inverse();</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="st">  Eigen::MatrixXd T3 = X * T2;</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="st">  Eigen::MatrixXd T4 = X.transpose() * Y;</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="st">  Eigen::MatrixXd T5 = T3 * T4;</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="st">  Eigen::MatrixXd T6 = Y - T5;</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="st">  return Rcpp::wrap(T6);</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="st">}</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="st">"</span>, <span class="at">depends =</span> <span class="st">"RcppEigen"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>A custom function that uses Eigen + QR decomposition. The source code is:</p>
+<div class="sourceCode" id="cb13" data-include="resid.cpp"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>Rcpp<span class="sc">::</span><span class="fu">sourceCpp</span>(<span class="at">file=</span><span class="st">"resid.cpp"</span>, <span class="at">showOutput =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>qr_eigen <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y){</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">inherits</span>(x, <span class="st">"sparseMatrix"</span>))</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>        <span class="fu">qr_sparse_residop</span>(x, <span class="fu">as.matrix</span>(y))</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">qr_dense_residop</span>(x, y)</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>A custom function that uses QR decomposition, using Eigen only if the matrix is sparse:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>qr_eigen_partial <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y){</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">inherits</span>(x, <span class="st">"sparseMatrix"</span>))</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>        <span class="fu">qr</span>(x) <span class="sc">|&gt;</span> <span class="fu">qr.resid</span>(<span class="fu">as.matrix</span>(y))</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">qr_dense_residop</span>(x, y)</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>A built-in function that uses C++ but comes with the <code>RcppEigen</code> package:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>eigen_fastlm_resid <span class="ot">&lt;-</span> <span class="cf">function</span>(...){</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  RcppEigen<span class="sc">::</span><span class="fu">fastLm</span>(...) <span class="sc">|&gt;</span> <span class="fu">resid</span>()</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The Rfast package’s version of <code>lm</code>:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>rfast_resid <span class="ot">&lt;-</span> <span class="cf">function</span>(...){</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  Rfast<span class="sc">::</span><span class="fu">lmfit</span>(...)<span class="sc">$</span>residuals</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="benchmark" class="level2">
+<h2 class="anchored" data-anchor-id="benchmark">Benchmark</h2>
+<p>This function evaluates a given residual calculation and returns the time and memory usage:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>benchmark <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y, calculate, repetition, ...){</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  time <span class="ot">&lt;-</span> bench<span class="sc">::</span><span class="fu">mark</span>({</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>      result <span class="ot">&lt;-</span> <span class="fu">try</span>(<span class="fu">calculate</span>(x, y), <span class="at">silent =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  }, <span class="at">min_iterations =</span> repetition)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>  time <span class="sc">|&gt;</span> dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">result =</span> <span class="fu">list</span>(result),</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>    ...</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Compile all the functions to benchmark:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>all_funcs <span class="ot">=</span> <span class="fu">list</span>(</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">qr=</span>qr_resid,</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">formula=</span>formula_resid,</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">lm=</span>lm_resid,</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">eigen_cpp=</span>eigen_resid,</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">qr_eigen=</span>qr_eigen,</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">qr_eigen_partial=</span>qr_eigen_partial,</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">.lm.fit=</span>lm_fit_resid,</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># eigen_fastlm has a number of modes</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">eigen_fastlm_colpiv_qr =</span> \(x, y) <span class="fu">eigen_fastlm_resid</span>(x, y, <span class="dv">0</span>),</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">eigen_fastlm_unpiv_qr =</span> \(x, y) <span class="fu">eigen_fastlm_resid</span>(x, y, <span class="dv">1</span>),</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">eigen_fastlm_llt_chol =</span> \(x, y) <span class="fu">eigen_fastlm_resid</span>(x, y, <span class="dv">2</span>),</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">eigen_fastlm_ldlt_chol =</span> \(x, y) <span class="fu">eigen_fastlm_resid</span>(x, y, <span class="dv">3</span>),</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">eigen_fastlm_jacobi_svd =</span> \(x, y) <span class="fu">eigen_fastlm_resid</span>(x, y, <span class="dv">4</span>),</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">eigen_fastlm_eig =</span> \(x, y) <span class="fu">eigen_fastlm_resid</span>(x, y, <span class="dv">4</span>),</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">rfast =</span> rfast_resid</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Run the benchmark:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>tibble<span class="sc">::</span><span class="fu">tibble</span>(</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="fu">names</span>(all_funcs),</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">calculate =</span> all_funcs,</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">cross_join</span>(</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">tibble</span>(</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="fu">list</span>(</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>        <span class="fu">make_dense</span>(<span class="at">nrow =</span> <span class="dv">10000</span>, <span class="at">ncol =</span> <span class="dv">500</span>),</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>        <span class="fu">make_sparse</span>(<span class="at">nrow =</span> <span class="dv">10000</span>, <span class="at">ncol =</span> <span class="dv">500</span>)</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">x_type =</span> <span class="fu">c</span>(<span class="st">"dense"</span>, <span class="st">"sparse"</span>)</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">cross_join</span>(</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">tibble</span>(</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">make_y =</span> <span class="fu">list</span>(</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>        make_y_matrix,</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>        make_y_vector</span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">y_type =</span> <span class="fu">c</span>(<span class="st">"y_matrix"</span>, <span class="st">"y_vector"</span>)</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> </span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">y =</span> purrr<span class="sc">::</span><span class="fu">map2</span>(x, make_y, <span class="cf">function</span>(x, make_y) <span class="fu">make_y</span>(x)),</span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a>  <span class="at">make_y =</span> <span class="cn">NULL</span>,</span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a>  <span class="at">repetition =</span> <span class="dv">2</span>,</span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">filter</span>(</span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a>  <span class="co"># eigen_cpp will crash with a sparse matrix</span></span>
+<span id="cb21-30"><a href="#cb21-30" aria-hidden="true" tabindex="-1"></a>  <span class="sc">!</span>(x_type <span class="sc">==</span> <span class="st">"sparse"</span> <span class="sc">&amp;</span> name <span class="sc">==</span> <span class="st">"eigen_cpp"</span>)</span>
+<span id="cb21-31"><a href="#cb21-31" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb21-32"><a href="#cb21-32" aria-hidden="true" tabindex="-1"></a>purrr<span class="sc">::</span><span class="fu">pmap</span>(benchmark) <span class="sc">|&gt;</span></span>
+<span id="cb21-33"><a href="#cb21-33" aria-hidden="true" tabindex="-1"></a>purrr<span class="sc">::</span><span class="fu">list_rbind</span>() <span class="sc">|&gt;</span></span>
+<span id="cb21-34"><a href="#cb21-34" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb21-35"><a href="#cb21-35" aria-hidden="true" tabindex="-1"></a>  <span class="at">success =</span> result <span class="sc">|&gt;</span> purrr<span class="sc">::</span><span class="fu">map_lgl</span>(<span class="cf">function</span>(x){</span>
+<span id="cb21-36"><a href="#cb21-36" aria-hidden="true" tabindex="-1"></a>    <span class="sc">!</span>(x[[<span class="dv">1</span>]] <span class="sc">|&gt;</span> <span class="fu">attr</span>(<span class="st">"condition"</span>) <span class="sc">|&gt;</span> <span class="fu">inherits</span>(<span class="st">"error"</span>))</span>
+<span id="cb21-37"><a href="#cb21-37" aria-hidden="true" tabindex="-1"></a>  }) </span>
+<span id="cb21-38"><a href="#cb21-38" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb21-39"><a href="#cb21-39" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">select</span>(name, success, x_type, y_type, median, mem_alloc)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+
+<div data-pagedtable="false">
+  <script data-pagedtable-source="" type="application/json">
+{"columns":[{"label":["name"],"name":[1],"type":["chr"],"align":["left"]},{"label":["success"],"name":[2],"type":["lgl"],"align":["right"]},{"label":["x_type"],"name":[3],"type":["chr"],"align":["left"]},{"label":["y_type"],"name":[4],"type":["chr"],"align":["left"]},{"label":["median"],"name":[5],"type":["bench_tm"],"align":["right"]},{"label":["mem_alloc"],"name":[6],"type":["bnch_byt"],"align":["right"]}],"data":[{"1":"qr","2":"TRUE","3":"dense","4":"y_matrix","5":"1.507728s","6":"153.112434MB"},{"1":"qr","2":"TRUE","3":"dense","4":"y_vector","5":"1.460456s","6":"152.847931MB"},{"1":"qr","2":"TRUE","3":"sparse","4":"y_matrix","5":"1.531992s","6":"191.223831MB"},{"1":"qr","2":"TRUE","3":"sparse","4":"y_vector","5":"1.580397s","6":"190.994949MB"},{"1":"formula","2":"TRUE","3":"dense","4":"y_matrix","5":"20.837371s","6":"885.221909MB"},{"1":"formula","2":"TRUE","3":"dense","4":"y_vector","5":"21.337058s","6":"885.103752MB"},{"1":"formula","2":"FALSE","3":"sparse","4":"y_matrix","5":"54.543µs","6":"0B"},{"1":"formula","2":"FALSE","3":"sparse","4":"y_vector","5":"50.834µs","6":"0B"},{"1":"lm","2":"TRUE","3":"dense","4":"y_matrix","5":"1.732846s","6":"231.514237MB"},{"1":"lm","2":"TRUE","3":"dense","4":"y_vector","5":"1.575513s","6":"230.330429MB"},{"1":"lm","2":"FALSE","3":"sparse","4":"y_matrix","5":"129.668µs","6":"0B"},{"1":"lm","2":"FALSE","3":"sparse","4":"y_vector","5":"122.25µs","6":"0B"},{"1":"eigen_cpp","2":"TRUE","3":"dense","4":"y_matrix","5":"508.483085ms","6":"158.789062KB"},{"1":"eigen_cpp","2":"TRUE","3":"dense","4":"y_vector","5":"519.795105ms","6":"80.664062KB"},{"1":"qr_eigen","2":"TRUE","3":"dense","4":"y_matrix","5":"321.386147ms","6":"158.789062KB"},{"1":"qr_eigen","2":"TRUE","3":"dense","4":"y_vector","5":"332.954688ms","6":"80.664062KB"},{"1":"qr_eigen","2":"TRUE","3":"sparse","4":"y_matrix","5":"1.723794s","6":"315.085938KB"},{"1":"qr_eigen","2":"TRUE","3":"sparse","4":"y_vector","5":"1.727949s","6":"158.835938KB"},{"1":"qr_eigen_partial","2":"TRUE","3":"dense","4":"y_matrix","5":"323.045375ms","6":"158.789062KB"},{"1":"qr_eigen_partial","2":"TRUE","3":"dense","4":"y_vector","5":"305.172334ms","6":"80.664062KB"},{"1":"qr_eigen_partial","2":"TRUE","3":"sparse","4":"y_matrix","5":"1.574836s","6":"191.223831MB"},{"1":"qr_eigen_partial","2":"TRUE","3":"sparse","4":"y_vector","5":"1.586515s","6":"190.994949MB"},{"1":".lm.fit","2":"TRUE","3":"dense","4":"y_matrix","5":"1.595671s","6":"38.476242MB"},{"1":".lm.fit","2":"TRUE","3":"dense","4":"y_vector","5":"1.54481s","6":"38.317055MB"},{"1":".lm.fit","2":"FALSE","3":"sparse","4":"y_matrix","5":"49.043µs","6":"0B"},{"1":".lm.fit","2":"FALSE","3":"sparse","4":"y_vector","5":"48.833µs","6":"0B"},{"1":"eigen_fastlm_colpiv_qr","2":"FALSE","3":"dense","4":"y_matrix","5":"105.584µs","6":"177.492188KB"},{"1":"eigen_fastlm_colpiv_qr","2":"TRUE","3":"dense","4":"y_vector","5":"545.916085ms","6":"114.687675MB"},{"1":"eigen_fastlm_colpiv_qr","2":"FALSE","3":"sparse","4":"y_matrix","5":"4.091084ms","6":"38.149094MB"},{"1":"eigen_fastlm_colpiv_qr","2":"TRUE","3":"sparse","4":"y_vector","5":"554.738688ms","6":"152.829201MB"},{"1":"eigen_fastlm_unpiv_qr","2":"FALSE","3":"dense","4":"y_matrix","5":"109.626µs","6":"156.296875KB"},{"1":"eigen_fastlm_unpiv_qr","2":"TRUE","3":"dense","4":"y_vector","5":"342.587626ms","6":"114.682182MB"},{"1":"eigen_fastlm_unpiv_qr","2":"FALSE","3":"sparse","4":"y_matrix","5":"11.531834ms","6":"38.147018MB"},{"1":"eigen_fastlm_unpiv_qr","2":"TRUE","3":"sparse","4":"y_vector","5":"345.689043ms","6":"152.829201MB"},{"1":"eigen_fastlm_llt_chol","2":"FALSE","3":"dense","4":"y_matrix","5":"108.167µs","6":"156.296875KB"},{"1":"eigen_fastlm_llt_chol","2":"TRUE","3":"dense","4":"y_vector","5":"168.752166ms","6":"114.682182MB"},{"1":"eigen_fastlm_llt_chol","2":"FALSE","3":"sparse","4":"y_matrix","5":"3.702834ms","6":"38.147018MB"},{"1":"eigen_fastlm_llt_chol","2":"TRUE","3":"sparse","4":"y_vector","5":"205.472084ms","6":"152.829201MB"},{"1":"eigen_fastlm_ldlt_chol","2":"FALSE","3":"dense","4":"y_matrix","5":"116.8135µs","6":"156.296875KB"},{"1":"eigen_fastlm_ldlt_chol","2":"TRUE","3":"dense","4":"y_vector","5":"197.133249ms","6":"114.682182MB"},{"1":"eigen_fastlm_ldlt_chol","2":"FALSE","3":"sparse","4":"y_matrix","5":"10.423063ms","6":"38.147018MB"},{"1":"eigen_fastlm_ldlt_chol","2":"TRUE","3":"sparse","4":"y_vector","5":"238.302084ms","6":"152.829201MB"},{"1":"eigen_fastlm_jacobi_svd","2":"FALSE","3":"dense","4":"y_matrix","5":"135.8545µs","6":"156.296875KB"},{"1":"eigen_fastlm_jacobi_svd","2":"TRUE","3":"dense","4":"y_vector","5":"6.460445s","6":"114.682182MB"},{"1":"eigen_fastlm_jacobi_svd","2":"FALSE","3":"sparse","4":"y_matrix","5":"10.218916ms","6":"38.147018MB"},{"1":"eigen_fastlm_jacobi_svd","2":"TRUE","3":"sparse","4":"y_vector","5":"6.268073s","6":"152.829201MB"},{"1":"eigen_fastlm_eig","2":"FALSE","3":"dense","4":"y_matrix","5":"97.042µs","6":"156.296875KB"},{"1":"eigen_fastlm_eig","2":"TRUE","3":"dense","4":"y_vector","5":"6.311698s","6":"114.682182MB"},{"1":"eigen_fastlm_eig","2":"FALSE","3":"sparse","4":"y_matrix","5":"11.607563ms","6":"38.147018MB"},{"1":"eigen_fastlm_eig","2":"TRUE","3":"sparse","4":"y_vector","5":"6.654479s","6":"152.829201MB"},{"1":"rfast","2":"TRUE","3":"dense","4":"y_matrix","5":"1.153816s","6":"5.111496MB"},{"1":"rfast","2":"TRUE","3":"dense","4":"y_vector","5":"1.140232s","6":"3.99247MB"},{"1":"rfast","2":"FALSE","3":"sparse","4":"y_matrix","5":"54.209µs","6":"0B"},{"1":"rfast","2":"FALSE","3":"sparse","4":"y_vector","5":"51.875µs","6":"0B"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
