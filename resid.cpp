@@ -6,7 +6,7 @@ using Eigen::HouseholderQR;
 using Eigen::MatrixXd;
 using Eigen::SparseMatrix;
 using Eigen::SparseQR;
-using Eigen::COLAMDOrdering;
+using Eigen::NaturalOrdering;
 
 // [[Rcpp::depends(RcppEigen)]]
 
@@ -17,7 +17,7 @@ SEXP qr_dense_residop(Map<MatrixXd> X, Map<MatrixXd> Y){
 }
 
 // [[Rcpp::export]]
-SEXP qr_sparse_residop(Map<SparseMatrix<double>> X, Map<SparseMatrix<double>> Y){
-  const SparseQR<SparseMatrix<double>, COLAMDOrdering<int>> QR(X);
+SEXP qr_sparse_residop(Map<SparseMatrix<double>> X, Map<MatrixXd> Y){
+  const SparseQR<SparseMatrix<double>, NaturalOrdering<int>> QR(X);
   return Rcpp::wrap(Y - (X * QR.solve(Y)));
 }

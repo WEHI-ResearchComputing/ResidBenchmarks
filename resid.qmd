@@ -7,6 +7,7 @@ df-print: paged
 
 ## Functions for generating matrices
 
+These functions generate test X and Y vectors and matrices.
 ```{r}
 make_dense <- function(nrow, ncol){
   rnorm(nrow * ncol, mean = 1, sd = 5) |> matrix(nrow=nrow)
@@ -24,7 +25,7 @@ make_sparse <- function(nrow, ncol){
 ```{r}
 make_y_vector <- function(x){
   beta <- ncol(x) |> runif(max=100)
-  as.numeric(x %*% beta)
+  as.numeric(as.matrix(x) %*% beta)
 }
 make_dense(4, 4) |> 
   make_y_vector()
@@ -38,36 +39,43 @@ make_y_matrix <- function(x, cols=2){
 make_dense(4, 4) |> 
   make_y_matrix()
 ```
+
 ## Functions for calculating residuals
 
 These functions take the vector $\vec{y}$ and matrix $X$, and return the residuals resulting from estimating $\vec{y}$ from $X$ using ordinary least squares regression:
 
 $\mathbf{y} - \left(\mathbf {X} ^{\operatorname {T} }\mathbf {X} \right)^{-1}\mathbf {X} ^{\operatorname {T} }\mathbf {y}$
 
-```{r}
-qr_resid <- function(x, y){
-  qr(x) |> qr.resid(y)
-}
-```
-
+Using standard matrix operations in R:
 ```{r}
 formula_resid <- function(x, y){
   y - x %*% solve(t(x) %*% x) %*% t(x) %*% y
 }
 ```
 
+Base R's QR decomposition:
+```{r}
+qr_resid <- function(x, y){
+  qr(x) |> qr.resid(as.matrix(y))
+}
+```
+
+
+Base R's `lm` function:
 ```{r}
 lm_resid <- function(x, y){
   lm(y ~ x) |> resid()
 }
 ```
 
+Base R's `.lm.fit`, which is a lower level function underlying `lm`:
 ```{r}
 lm_fit_resid <- function(x, y){
   .lm.fit(x, y)$residuals
 }
 ```
 
+Algebraically calculating the residuals, but using Eigen C++ instead of base R:
 ```{r}
 eigen_resid <- Rcpp::cppFunction("
 SEXP fastResidop(const Eigen::Map<Eigen::MatrixXd> X, Eigen::Map<Eigen::MatrixXd> Y){
@@ -83,36 +91,66 @@ SEXP fastResidop(const Eigen::Map<Eigen::MatrixXd> X, Eigen::Map<Eigen::MatrixXd
 ```
 
 
-This is a custom function that uses Eigen + QR decomposition.
+A custom function that uses Eigen + QR decomposition.
 The source code is:
 
-```{.cpp include="resip.cpp"}
+```{.cpp include="resid.cpp"}
 ```
 
 ```{r}
 Rcpp::sourceCpp(file="resid.cpp", showOutput = FALSE)
+```
+
+```{r}
 qr_eigen <- function(x, y){
     if (inherits(x, "sparseMatrix"))
-        qr_sparse_residop(x, y)
+        qr_sparse_residop(x, as.matrix(y))
     else
         qr_dense_residop(x, y)
 }
 ```
 
+A custom function that uses QR decomposition, using Eigen only if the matrix is sparse:
+```{r}
+qr_eigen_partial <- function(x, y){
+    if (inherits(x, "sparseMatrix"))
+        qr(x) |> qr.resid(as.matrix(y))
+    else
+        qr_dense_residop(x, y)
+}
+```
+
+A built-in function that uses C++ but comes with the `RcppEigen` package:
 ```{r}
 eigen_fastlm_resid <- function(...){
   RcppEigen::fastLm(...) |> resid()
 }
 ```
 
+The Rfast package's version of `lm`:
 ```{r}
 rfast_resid <- function(...){
   Rfast::lmfit(...)$residuals
 }
 ```
 
-## Demos
+## Benchmark
 
+This function evaluates a given residual calculation and returns the time and memory usage:
+```{r}
+benchmark <- function(x, y, calculate, repetition, ...){
+  time <- bench::mark({
+      result <- try(calculate(x, y), silent = TRUE)
+  }, min_iterations = repetition)
+  
+  time |> dplyr::mutate(
+    result = list(result),
+    ...
+  )
+}
+```
+
+Compile all the functions to benchmark:
 ```{r}
 all_funcs = list(
   qr=qr_resid,
@@ -120,7 +158,9 @@ all_funcs = list(
   lm=lm_resid,
   eigen_cpp=eigen_resid,
   qr_eigen=qr_eigen,
+  qr_eigen_partial=qr_eigen_partial,
   .lm.fit=lm_fit_resid,
+  # eigen_fastlm has a number of modes
   eigen_fastlm_colpiv_qr = \(x, y) eigen_fastlm_resid(x, y, 0),
   eigen_fastlm_unpiv_qr = \(x, y) eigen_fastlm_resid(x, y, 1),
   eigen_fastlm_llt_chol = \(x, y) eigen_fastlm_resid(x, y, 2),
@@ -131,51 +171,33 @@ all_funcs = list(
 )
 ```
 
-```{r}
-x <- make_dense(10, 2)
-x
-```
-```{r}
-y <- make_y_vector(x)
-y
-```
-## Benchmark
-
-```{r}
-benchmark <- function(make_x, make_y, nrow, calculate, repetition, ...){
-  time <- bench::mark({
-     ncol <- nrow / 10
-      x <- make_x(nrow, ncol)
-      y <- make_y(x)
-      result <- try(calculate(x, y))
-  }, min_iterations = repetition)
-  
-  time |> dplyr::mutate(
-    result = list(result),
-    ...
-  )
-}
-```
-
-```{r}
+Run the benchmark:
+```{r, error=FALSE, message=FALSE, warning=FALSE}
 tibble::tibble(
     name = names(all_funcs),
     calculate = all_funcs,
 ) |>
 dplyr::cross_join(
   tibble::tibble(
-    make_x = list(make_dense, make_sparse),
+    x = list(
+        make_dense(nrow = 10000, ncol = 500),
+        make_sparse(nrow = 10000, ncol = 500)
+    ),
     x_type = c("dense", "sparse")
   )
 ) |>
 dplyr::cross_join(
   tibble::tibble(
-    make_y = list(make_y_matrix, make_y_vector),
+    make_y = list(
+        make_y_matrix,
+        make_y_vector
+    ),
     y_type = c("y_matrix", "y_vector")
   )
 ) |> 
 dplyr::mutate(
-  nrow = 4000,
+  y = purrr::map2(x, make_y, function(x, make_y) make_y(x)),
+  make_y = NULL,
   repetition = 2,
 ) |>
 dplyr::filter(
