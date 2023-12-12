@@ -82,8 +82,15 @@ SEXP fastResidop(const Eigen::Map<Eigen::MatrixXd> X, Eigen::Map<Eigen::MatrixXd
 ", depends = "RcppEigen")
 ```
 
+
+This is a custom function that uses Eigen + QR decomposition.
+The source code is:
+
+```{.cpp include="resip.cpp"}
+```
+
 ```{r}
-eigen_resid_qr <- Rcpp::sourceCpp(file="resid.cpp")
+Rcpp::sourceCpp(file="resid.cpp", showOutput = FALSE)
 ```
 
 ```{r}
